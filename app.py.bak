@@ -14,7 +14,7 @@ import requests
 load_dotenv()
 
 app = Flask(__name__)
-app.secret_key = os.getenv("FLASK_SECRET_KEY", "byRoxy-Claude-2026")
+app.secret_key = os.getenv("FLASK_SECRET_KEY", "roxy-pro-2026-vision")
 MASTER_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123") 
 DB_PATH = 'chat_history.db'
 
@@ -63,18 +63,12 @@ def admin_panel():
         users = conn.execute('SELECT u.id, u.access_key, u.note, u.created_at, COUNT(s.id) FROM users u LEFT JOIN sessions s ON u.id = s.user_id GROUP BY u.id ORDER BY u.created_at DESC').fetchall()
     return render_template('admin.html', users=users)
 
-@app.route('/admin/create_key', methods=['POST'])
-def create_key():
-    with sqlite3.connect(DB_PATH) as conn:
-        conn.execute('INSERT INTO users (access_key, note) VALUES (?, ?)', ("CL-"+secrets.token_hex(4).upper(), request.form.get('note')))
-    return redirect(url_for('admin_panel'))
-
 @app.route('/')
 @login_required
 def index():
     return render_template('index.html')
 
-# --- ANA MOTOR: CLAUDE'UN TAVSİYESİYLE ---
+# --- ANA MOTOR: GÖRSEL YETENEKLİ VE TEMİZ GEÇMİŞLİ ---
 @app.route('/api/chat', methods=['POST'])
 @login_required
 def chat():
@@ -83,85 +77,89 @@ def chat():
     session_id = request.form.get("session_id")
     file = request.files.get("file")
 
+    # Claude için karmaşık içerik listesi, DB için temiz metin
     ai_content_list = []
-    display_msg = user_input
+    db_display_msg = user_input
 
     if file:
-        fname = file.filename.lower()
+        fname = file.filename
         mtype = file.content_type
         fdata = file.read()
         
-        # 1. CLAUDE'UN DEDİĞİ GİBİ: FOTOĞRAFLARI BASE64 GÖNDER
+        # 1. FOTOĞRAFLARI BASE64 PAKETLE (GÖRSEL YETENEK)
         if mtype.startswith('image/'):
             b64_img = base64.b64encode(fdata).decode('utf-8')
-            display_msg = f"📎 [Fotoğraf: {file.filename}] {user_input}"
+            db_display_msg = f"📎 [Fotoğraf: {fname}] {user_input}"
             ai_content_list.append({
                 "type": "image_url",
                 "image_url": {"url": f"data:{mtype};base64,{b64_img}"}
             })
         
-        # 2. DÖKÜMANLARI METİN OLARAK GÖNDER (Proxy limitine takılmamak için)
-        elif fname.endswith(('.pdf', '.txt', '.py', '.js', '.html')):
+        # 2. DÖKÜMANLARI METNE ÇEVİR (PDF/TXT)
+        elif fname.lower().endswith(('.pdf', '.txt', '.py', '.js', '.html')):
             text = ""
-            if fname.endswith('.pdf'):
+            if fname.lower().endswith('.pdf'):
                 reader = PyPDF2.PdfReader(io.BytesIO(fdata))
                 for p in reader.pages: text += (p.extract_text() or "") + "\n"
             else:
                 text = fdata.decode('utf-8', errors='ignore')
             
-            display_msg = f"📎 [Dosya: {file.filename}] {user_input}"
-            ai_content_list.append({"type": "text", "text": f"Dosya İçeriği:\n{text}"})
+            db_display_msg = f"📎 [Dosya: {fname}] {user_input}"
+            ai_content_list.append({"type": "text", "text": f"Dosya İçeriği ({fname}):\n{text}"})
 
-    # Kullanıcının sorusunu ekle
-    ai_content_list.append({"type": "text", "text": user_input or "Bu dosyayı analiz et."})
+    # Kullanıcının asıl sorusunu ekle
+    ai_content_list.append({"type": "text", "text": user_input or "Bu dosyayı incele."})
 
-    # Veritabanı İşlemleri
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
+    
     if not session_id or session_id == 'null':
         cursor.execute('INSERT INTO sessions (user_id, title) VALUES (?, ?)', (user_id, user_input[:30] or "Dosya Analizi"))
         session_id = cursor.lastrowid
         is_new = True
     else: is_new = False
 
-    cursor.execute('INSERT INTO messages (session_id, role, content) VALUES (?, ?, ?)', (session_id, "user", display_msg))
+    # 🚀 KRİTİK NOKTA: Veritabanına sadece TEMİZ halini (Etiketi) kaydediyoruz
+    cursor.execute('INSERT INTO messages (session_id, role, content) VALUES (?, ?, ?)', (session_id, "user", db_display_msg))
     conn.commit()
 
-    # Geçmişi çek ve Claude formatına sok
+    # Geçmişi çek
     history = [{"role": r[0], "content": r[1]} for r in cursor.execute('SELECT role, content FROM messages WHERE session_id = ? ORDER BY id ASC', (session_id,)).fetchall()]
     
-    # SADECE BU İSTEK İÇİN: Son mesajı Claude'un istediği "content list" formatına çevir
+    # 🚀 KRİTİK NOKTA 2: API'ye giderken son mesajı TAM içerikle (Base64 veya Text) değiştiriyoruz
+    # Böylece Claude her şeyi görüyor ama DB şişmiyor
     history[-1]["content"] = ai_content_list
 
     try:
-        res = requests.post(API_URL, json={"model": "claude-sonnet-4-5-20250929", "messages": history}, timeout=60)
+        payload = {
+            "model": "claude-sonnet-4-5-20250929",
+            "messages": history,
+            "max_tokens": 4096
+        }
+        res = requests.post(API_URL, json=payload, timeout=60)
+        
         if res.status_code == 200:
             bot_res = res.json()['choices'][0]['message']['content']
             cursor.execute('INSERT INTO messages (session_id, role, content) VALUES (?, ?, ?)', (session_id, "assistant", bot_res))
             conn.commit()
             conn.close()
             return jsonify({"response": bot_res, "session_id": session_id, "new_session": is_new})
-    except: pass
+    except Exception as e:
+        print(f"Hata: {e}")
     
     conn.close()
-    return jsonify({"response": "Hata: Proxy fotoğrafı reddetti (boyut çok büyük olabilir)."}), 500
+    return jsonify({"response": "Hata: Sunucu meşgul veya dosya çok büyük."}), 500
 
+# Diğer yardımcı rotalar (seans çekme, silme vb.)
 @app.route('/api/sessions')
 def get_sessions():
     with sqlite3.connect(DB_PATH) as conn:
         return jsonify([{"id": r[0], "title": r[1]} for r in conn.execute('SELECT id, title FROM sessions WHERE user_id = ? ORDER BY created_at DESC', (session['user_id'],)).fetchall()])
 
 @app.route('/api/session/<int:id>')
-def get_history(id):
+def get_hist(id):
     with sqlite3.connect(DB_PATH) as conn:
         return jsonify([{"role": r[0], "content": r[1]} for r in conn.execute('SELECT role, content FROM messages WHERE session_id = ? ORDER BY id ASC', (id,)).fetchall()])
-
-@app.route('/api/session/<int:session_id>', methods=['DELETE'])
-def delete_session(session_id):
-    with sqlite3.connect(DB_PATH) as conn:
-        conn.execute('DELETE FROM messages WHERE session_id = ?', (session_id,))
-        conn.execute('DELETE FROM sessions WHERE id = ?', (session_id,))
-    return jsonify({"status": "ok"})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
