@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="tr" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Claude Admin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>body { background-color: #09090b; color: #e4e4e7; }</style>
+</head>
+<body class="p-4 md:p-10 max-w-6xl mx-auto font-sans">
+    
+    <div class="flex flex-col md:flex-row justify-between items-center mb-10 gap-4">
+        <div>
+            <h1 class="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-purple-400">Yönetim Paneli</h1>
+            <p class="text-gray-400 mt-1">Sistemdeki kullanıcıları ve erişim anahtarlarını yönet.</p>
+        </div>
+        
+        <div class="flex gap-3">
+            <a href="/" class="bg-white/5 hover:bg-white/10 px-4 py-2 rounded-lg text-sm transition border border-white/10">Sohbete Dön</a>
+            <a href="/logout" class="bg-red-500/10 hover:bg-red-500/20 text-red-400 px-4 py-2 rounded-lg text-sm transition border border-red-500/20">Çıkış Yap</a>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        <div class="bg-[#18181b] p-6 rounded-2xl border border-white/10">
+            <div class="text-gray-400 text-sm">Toplam Kullanıcı</div>
+            <div class="text-3xl font-bold text-white mt-1">{{ users|length }}</div>
+        </div>
+        </div>
+
+    <div class="bg-[#18181b] border border-white/10 rounded-2xl p-6 mb-8 shadow-xl">
+        <h2 class="text-lg font-bold mb-4 text-white flex items-center gap-2">
+            <span class="w-6 h-6 rounded-full bg-green-500/20 text-green-400 flex items-center justify-center text-sm">+</span>
+            Yeni Anahtar Oluştur
+        </h2>
+        <form action="/admin/create_key" method="POST" class="flex flex-col md:flex-row gap-4">
+            <input type="text" name="note" placeholder="Kime verilecek? (Örn: Ahmet, Müşteri X)" required
+                class="flex-1 bg-black/30 border border-white/10 rounded-xl p-3 text-white focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition placeholder:text-gray-600">
+            <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white px-8 py-3 rounded-xl font-bold transition shadow-lg shadow-indigo-900/20">
+                Oluştur
+            </button>
+        </form>
+    </div>
+
+    <div class="overflow-hidden rounded-2xl border border-white/10 bg-[#18181b] shadow-2xl">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="bg-white/5 text-gray-400 text-xs uppercase tracking-wider border-b border-white/10">
+                        <th class="p-5 font-medium">Kullanıcı / Not</th>
+                        <th class="p-5 font-medium">Erişim Anahtarı</th>
+                        <th class="p-5 font-medium text-center">Sohbetler</th>
+                        <th class="p-5 font-medium">Oluşturulma</th>
+                        <th class="p-5 font-medium text-right">İşlem</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-white/5 text-sm">
+                    {% for user in users %}
+                    <tr class="hover:bg-white/5 transition group">
+                        
+                        <td class="p-5">
+                            <div class="font-bold text-white text-base">{{ user[2] }}</div>
+                            <div class="text-xs text-gray-500">ID: #{{ user[0] }}</div>
+                        </td>
+                        
+                        <td class="p-5">
+                            <code class="font-mono text-indigo-300 bg-indigo-500/10 px-2 py-1 rounded border border-indigo-500/20 select-all cursor-pointer hover:bg-indigo-500/20 transition" title="Kopyalamak için seçin">{{ user[1] }}</code>
+                        </td>
+                        
+                        <td class="p-5 text-center">
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-800 text-gray-300 border border-white/5">
+                                {{ user[4] }} Sohbet
+                            </span>
+                        </td>
+                        
+                        <td class="p-5 text-gray-500 font-mono text-xs whitespace-nowrap">
+                            {{ user[3] }}
+                        </td>
+                        
+                        <td class="p-5 text-right">
+                            <form action="/admin/delete_key/{{ user[0] }}" method="POST" onsubmit="return confirm('⚠️ DİKKAT:\n\nBu kullanıcıyı silersen:\n- Erişim anahtarı iptal olur.\n- Tüm sohbet geçmişi silinir.\n\nBu işlem geri alınamaz. Devam edilsin mi?');" class="inline-block">
+                                <button type="submit" class="group/btn flex items-center gap-2 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white px-3 py-2 rounded-lg transition border border-red-500/20 hover:border-red-500">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                    <span class="text-xs font-bold">Sil</span>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="5" class="p-10 text-center text-gray-500 flex flex-col items-center gap-2">
+                            <span class="text-2xl">📭</span>
+                            <span>Henüz hiç anahtar oluşturulmamış.</span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</body>
+</html>

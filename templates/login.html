@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="tr" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Girişi</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>body { background-color: #09090b; color: white; }</style>
+</head>
+<body class="flex items-center justify-center h-screen bg-[url('https://grainy-gradients.vercel.app/noise.svg')]">
+    <div class="w-full max-w-md p-8 bg-[#18181b]/80 backdrop-blur-xl rounded-3xl border border-white/10 shadow-2xl">
+        <div class="text-center mb-8">
+            <div class="w-16 h-16 bg-gradient-to-tr from-indigo-500 to-purple-500 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4 shadow-lg shadow-indigo-500/20">🔑</div>
+            <h1 class="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">Claude Access</h1>
+            <p class="text-gray-400 text-sm mt-2">Size verilen erişim anahtarını girin.</p>
+        </div>
+
+        <form method="POST" action="/login" class="space-y-4">
+            <div>
+                <input type="text" name="access_key" placeholder="Anahtar (Örn: CL-A1B2...)" required 
+                    class="w-full bg-[#09090b]/50 border border-white/10 rounded-xl p-4 text-center text-white text-lg tracking-widest font-mono uppercase focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition placeholder:normal-case placeholder:tracking-normal">
+            </div>
+            
+            {% if error %}
+            <div class="text-red-400 text-sm text-center bg-red-500/10 p-3 rounded-xl border border-red-500/20 animate-pulse">
+                🚫 {{ error }}
+            </div>
+            {% endif %}
+
+            <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-4 rounded-xl transition shadow-lg shadow-indigo-900/20 transform hover:scale-[1.02] active:scale-[0.98]">
+                Sisteme Bağlan
+            </button>
+        </form>
+        
+        <div class="mt-6 text-center text-xs text-gray-600">
+            Powered by Claude 4.5 & Diwness API
+        </div>
+    </div>
+</body>
+</html>
