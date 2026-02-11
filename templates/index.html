@@ -15,7 +15,6 @@
         .custom-scroll::-webkit-scrollbar-thumb { background-color: #3f3f46; border-radius: 20px; }
         .prose pre { margin: 0; border-radius: 0.5rem; overflow: hidden; position: relative; }
         
-        /* Kopyala Butonu */
         .copy-btn { 
             position: absolute; top: 8px; right: 8px; z-index: 10;
             background: rgba(255, 255, 255, 0.1); color: #e4e4e7;
@@ -23,12 +22,10 @@
             cursor: pointer;
         }
 
-        /* Sidebar Animasyon */
         .sidebar-transition { transition: transform 0.3s ease-in-out; }
         .sidebar-closed { transform: translateX(-100%); }
         .sidebar-open { transform: translateX(0); }
 
-        /* Aktif Sohbet Rengi */
         .active-session { 
             background-color: rgba(99, 102, 241, 0.2) !important; 
             border-left: 3px solid #6366f1;
@@ -57,8 +54,7 @@
             
             <div class="flex-1 overflow-y-auto custom-scroll p-2">
                 <div class="text-xs font-semibold text-gray-500 px-3 py-2 uppercase tracking-wider">Geçmiş</div>
-                <div id="session-list" class="space-y-1">
-                    </div>
+                <div id="session-list" class="space-y-1"></div>
             </div>
 
             <div class="p-4 border-t border-white/10 bg-[#09090b]">
@@ -91,11 +87,28 @@
             </div>
 
             <div class="flex-none p-3 md:p-5 bg-[#09090b] border-t border-white/5 w-full">
-                <div class="max-w-3xl mx-auto relative bg-[#18181b] rounded-2xl border border-white/10 focus-within:border-indigo-500/50 shadow-lg transition-colors">
-                    <textarea id="user-input" rows="1" class="w-full bg-transparent text-white p-4 pr-14 max-h-32 focus:outline-none resize-none overflow-hidden text-[16px]" placeholder="Bir şeyler yazın..." oninput="this.style.height = ''; this.style.height = Math.min(this.scrollHeight, 120) + 'px'"></textarea>
-                    <button onclick="sendMessage()" id="send-btn" class="absolute bottom-2 right-2 p-2 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-white transition disabled:opacity-50 shadow-lg">
-                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M12 5l7 7-7 7" /></svg>
-                    </button>
+                <div class="max-w-3xl mx-auto space-y-2">
+                    
+                    <div id="file-preview" class="hidden flex items-center gap-2 bg-indigo-500/10 border border-indigo-500/20 p-2 rounded-lg text-xs text-indigo-300 w-fit">
+                        <span class="text-base">📄</span>
+                        <span id="file-name" class="font-mono">dosya.pdf</span>
+                        <button onclick="removeFile()" class="ml-2 hover:text-white font-bold">✕</button>
+                    </div>
+
+                    <div class="relative bg-[#18181b] rounded-2xl border border-white/10 focus-within:border-indigo-500/50 shadow-lg transition-colors">
+                        <textarea id="user-input" rows="1" class="w-full bg-transparent text-white p-4 pr-24 max-h-32 focus:outline-none resize-none overflow-hidden text-[16px]" placeholder="Bir şeyler yazın veya dosya ekleyin..." oninput="this.style.height = ''; this.style.height = Math.min(this.scrollHeight, 120) + 'px'"></textarea>
+                        
+                        <div class="absolute bottom-2 right-2 flex items-center gap-1">
+                            <input type="file" id="file-input" class="hidden" onchange="handleFileSelection(this)">
+                            <button onclick="document.getElementById('file-input').click()" class="p-2 text-gray-400 hover:text-indigo-400 transition" title="Dosya Ekle">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg>
+                            </button>
+
+                            <button onclick="sendMessage()" id="send-btn" class="p-2 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-white transition disabled:opacity-50 shadow-lg">
+                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M12 5l7 7-7 7" /></svg>
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </main>
@@ -105,31 +118,39 @@
         marked.setOptions({ highlight: (code) => hljs.highlightAuto(code).value, breaks: true });
         
         let currentSessionId = null;
+        let selectedFile = null; // Yüklenen dosyayı tutar
 
-        // --- SESSION YÖNETİMİ ---
-        
+        // --- DOSYA YÖNETİMİ ---
+        function handleFileSelection(input) {
+            if (input.files.length > 0) {
+                selectedFile = input.files[0];
+                document.getElementById('file-name').innerText = selectedFile.name;
+                document.getElementById('file-preview').classList.remove('hidden');
+            }
+        }
+
+        function removeFile() {
+            selectedFile = null;
+            document.getElementById('file-input').value = "";
+            document.getElementById('file-preview').classList.add('hidden');
+        }
+
         async function loadSessions() {
             try {
                 const res = await fetch('/api/sessions');
-                // Eğer oturum süresi dolmuşsa (401/302), login'e at
                 if (res.redirected) { window.location.href = '/login'; return; }
-                
                 const sessions = await res.json();
                 const list = document.getElementById('session-list');
                 list.innerHTML = ''; 
-
                 if (sessions.length === 0) {
                     list.innerHTML = '<div class="text-xs text-center text-gray-600 py-4 italic">Henüz sohbet yok</div>';
                     return;
                 }
-
                 sessions.forEach(session => {
                     const div = document.createElement('div');
                     div.id = `session-${session.id}`;
                     div.className = `group flex items-center justify-between p-3 rounded-lg hover:bg-white/5 cursor-pointer transition text-sm text-gray-400 select-none`;
-                    
                     if (session.id === currentSessionId) div.classList.add('active-session');
-
                     div.innerHTML = `
                         <span onclick="loadChat(${session.id}, '${session.title.replace(/'/g, "\\'")}')" class="truncate flex-1">${session.title}</span>
                         <button onclick="deleteSession(${session.id}, event)" class="opacity-0 group-hover:opacity-100 text-red-400 hover:bg-white/10 p-1 rounded transition">
@@ -142,34 +163,22 @@
         }
 
         async function loadChat(id, title = "Sohbet") {
-            if (currentSessionId === id) {
-                 if(window.innerWidth < 768) toggleSidebar(); 
-                 return;
-            }
-
+            if (currentSessionId === id) { if(window.innerWidth < 768) toggleSidebar(); return; }
             currentSessionId = id;
             document.getElementById('header-title').innerText = title;
             highlightActiveSession(id);
-            
             const chatBox = document.getElementById('chat-box');
             chatBox.innerHTML = '<div class="flex justify-center pt-10"><span class="animate-spin text-2xl">⏳</span></div>';
-            
             const ws = document.getElementById('welcome-screen');
             if(ws) ws.style.display = 'none';
-
             if(window.innerWidth < 768) toggleSidebar();
-
             try {
                 const res = await fetch(`/api/session/${id}`);
-                if (res.redirected) { window.location.href = '/login'; return; }
                 const messages = await res.json();
-                
                 chatBox.innerHTML = ''; 
                 messages.forEach(msg => appendMessage(msg.role, msg.content, false));
                 scrollToBottom();
-            } catch (e) {
-                chatBox.innerHTML = '<div class="text-center text-red-400 mt-10">Sohbet yüklenemedi.</div>';
-            }
+            } catch (e) { chatBox.innerHTML = '<div class="text-center text-red-400 mt-10">Sohbet yüklenemedi.</div>'; }
         }
 
         function highlightActiveSession(id) {
@@ -182,14 +191,12 @@
             currentSessionId = null;
             document.getElementById('header-title').innerText = "Yeni Sohbet";
             document.querySelectorAll('#session-list > div').forEach(div => div.classList.remove('active-session'));
-
             document.getElementById('chat-box').innerHTML = `
                 <div id="welcome-screen" class="flex flex-col items-center justify-center h-full text-center space-y-6 opacity-80">
                     <div class="w-16 h-16 bg-white/5 rounded-2xl flex items-center justify-center text-3xl border border-white/5 shadow-2xl">🤖</div>
                     <h2 class="text-xl font-bold text-white">Yeni Sohbet</h2>
                     <p class="text-sm text-gray-500">Claude 4.5 & Pollinations</p>
                 </div>`;
-            
             if(window.innerWidth < 768) toggleSidebar();
         }
 
@@ -205,14 +212,27 @@
         async function sendMessage() {
             const input = document.getElementById('user-input');
             const message = input.value.trim();
-            if (!message) return;
+            if (!message && !selectedFile) return;
+
+            // --- FORM DATA OLUŞTUR (YENİ) ---
+            const formData = new FormData();
+            formData.append('message', message);
+            formData.append('session_id', currentSessionId);
+            if (selectedFile) {
+                formData.append('file', selectedFile);
+            }
 
             input.value = '';
             input.style.height = 'auto';
             const ws = document.getElementById('welcome-screen');
             if(ws) ws.style.display = 'none';
 
-            appendMessage('user', message);
+            // Ekranda dosya ikonunu göster
+            const displayMsg = selectedFile ? `📎 [Dosya: ${selectedFile.name}]\n${message}` : message;
+            appendMessage('user', displayMsg);
+            
+            // Dosyayı temizle
+            removeFile();
 
             const chatBox = document.getElementById('chat-box');
             const loading = document.createElement('div');
@@ -223,24 +243,23 @@
             scrollToBottom();
 
             try {
+                // Not: FormData gönderirken 'Content-Type' header'ı manuel set edilmez!
                 const res = await fetch('/api/chat', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: message, session_id: currentSessionId })
+                    body: formData
                 });
                 
                 if (res.redirected) { window.location.href = '/login'; return; }
-                
                 const data = await res.json();
                 document.getElementById('loading').remove();
                 
-                if (data.session_id && data.new_session) {
+                if (data.session_id) {
                     currentSessionId = data.session_id;
-                    document.getElementById('header-title').innerText = data.title;
-                    await loadSessions(); 
-                    highlightActiveSession(currentSessionId); 
+                    if(data.new_session) {
+                        await loadSessions();
+                        highlightActiveSession(currentSessionId);
+                    }
                 }
-                
                 appendMessage('assistant', data.response);
             } catch (e) {
                 if(document.getElementById('loading')) document.getElementById('loading').remove();
@@ -253,14 +272,12 @@
             const isBot = role === 'assistant';
             const div = document.createElement('div');
             div.className = `flex ${isBot ? 'justify-start' : 'justify-end'} ${animate ? 'animate-fade-in' : ''}`;
-            
             const html = marked.parse(content);
             div.innerHTML = `
                 <div class="max-w-[95%] md:max-w-[80%] rounded-2xl p-4 md:p-5 ${isBot ? 'bg-transparent' : 'bg-[#27272a] shadow-md'} text-gray-200">
-                    ${isBot ? '<div class="text-xs font-bold text-indigo-400 mb-2">CLAUDE</div>' : ''}
+                    ${isBot ? '<div class="text-xs font-bold text-indigo-400 mb-2">CLAUDE 4.5</div>' : ''}
                     <div class="prose prose-invert max-w-none text-[15px] leading-relaxed">${html}</div>
                 </div>`;
-            
             chatBox.appendChild(div);
             if(isBot) addCopyButtons(div);
             scrollToBottom();
@@ -273,8 +290,7 @@
                 btn.className = 'copy-btn';
                 btn.innerText = 'Kopyala';
                 btn.onclick = (e) => {
-                    e.stopPropagation();
-                    navigator.clipboard.writeText(pre.innerText);
+                    navigator.clipboard.writeText(pre.innerText.replace('Kopyala', ''));
                     btn.innerText = '✓';
                     setTimeout(() => btn.innerText = 'Kopyala', 2000);
                 };

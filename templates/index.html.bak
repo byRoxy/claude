@@ -28,7 +28,7 @@
         .sidebar-closed { transform: translateX(-100%); }
         .sidebar-open { transform: translateX(0); }
 
-        /* Aktif Sohbet Rengi - Daha belirgin */
+        /* Aktif Sohbet Rengi */
         .active-session { 
             background-color: rgba(99, 102, 241, 0.2) !important; 
             border-left: 3px solid #6366f1;
@@ -49,7 +49,7 @@
             </div>
 
             <div class="p-3">
-                <button onclick="startNewChat()" class="w-full flex items-center gap-2 justify-center bg-indigo-600 hover:bg-indigo-700 text-white p-3 rounded-xl transition font-medium text-sm">
+                <button onclick="startNewChat()" class="w-full flex items-center gap-2 justify-center bg-indigo-600 hover:bg-indigo-700 text-white p-3 rounded-xl transition font-medium text-sm shadow-lg shadow-indigo-900/20">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                     Yeni Sohbet
                 </button>
@@ -59,6 +59,19 @@
                 <div class="text-xs font-semibold text-gray-500 px-3 py-2 uppercase tracking-wider">Geçmiş</div>
                 <div id="session-list" class="space-y-1">
                     </div>
+            </div>
+
+            <div class="p-4 border-t border-white/10 bg-[#09090b]">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-xs font-bold shadow-lg ring-2 ring-white/10">U</div>
+                        <div class="text-sm font-medium text-gray-300">Kullanıcı</div>
+                    </div>
+                    
+                    <a href="/logout" class="group flex items-center justify-center p-2 rounded-lg hover:bg-red-500/10 text-gray-400 hover:text-red-400 transition" title="Oturumu Kapat">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+                    </a>
+                </div>
             </div>
         </aside>
 
@@ -71,15 +84,16 @@
 
             <div id="chat-box" class="flex-1 overflow-y-auto custom-scroll p-4 md:p-8 space-y-6 scroll-smooth">
                 <div id="welcome-screen" class="flex flex-col items-center justify-center h-full text-center space-y-6 opacity-80">
-                    <div class="w-16 h-16 bg-white/5 rounded-2xl flex items-center justify-center text-3xl border border-white/5">🚀</div>
+                    <div class="w-16 h-16 bg-white/5 rounded-2xl flex items-center justify-center text-3xl border border-white/5 shadow-2xl">🤖</div>
                     <h2 class="text-xl font-bold text-white">Yardıma hazır.</h2>
+                    <p class="text-sm text-gray-500">Claude 4.5 & Pollinations Dual Engine</p>
                 </div>
             </div>
 
             <div class="flex-none p-3 md:p-5 bg-[#09090b] border-t border-white/5 w-full">
-                <div class="max-w-3xl mx-auto relative bg-[#18181b] rounded-2xl border border-white/10 focus-within:border-indigo-500/50 shadow-lg">
+                <div class="max-w-3xl mx-auto relative bg-[#18181b] rounded-2xl border border-white/10 focus-within:border-indigo-500/50 shadow-lg transition-colors">
                     <textarea id="user-input" rows="1" class="w-full bg-transparent text-white p-4 pr-14 max-h-32 focus:outline-none resize-none overflow-hidden text-[16px]" placeholder="Bir şeyler yazın..." oninput="this.style.height = ''; this.style.height = Math.min(this.scrollHeight, 120) + 'px'"></textarea>
-                    <button onclick="sendMessage()" id="send-btn" class="absolute bottom-2 right-2 p-2 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-white transition disabled:opacity-50">
+                    <button onclick="sendMessage()" id="send-btn" class="absolute bottom-2 right-2 p-2 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-white transition disabled:opacity-50 shadow-lg">
                         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M12 5l7 7-7 7" /></svg>
                     </button>
                 </div>
@@ -97,19 +111,24 @@
         async function loadSessions() {
             try {
                 const res = await fetch('/api/sessions');
+                // Eğer oturum süresi dolmuşsa (401/302), login'e at
+                if (res.redirected) { window.location.href = '/login'; return; }
+                
                 const sessions = await res.json();
                 const list = document.getElementById('session-list');
-                list.innerHTML = ''; // Listeyi temizle
+                list.innerHTML = ''; 
+
+                if (sessions.length === 0) {
+                    list.innerHTML = '<div class="text-xs text-center text-gray-600 py-4 italic">Henüz sohbet yok</div>';
+                    return;
+                }
 
                 sessions.forEach(session => {
                     const div = document.createElement('div');
-                    div.id = `session-${session.id}`; // ID ataması önemli (Seçim için)
+                    div.id = `session-${session.id}`;
                     div.className = `group flex items-center justify-between p-3 rounded-lg hover:bg-white/5 cursor-pointer transition text-sm text-gray-400 select-none`;
                     
-                    // Eğer şu anki aktif sohbet ise boya
-                    if (session.id === currentSessionId) {
-                        div.classList.add('active-session');
-                    }
+                    if (session.id === currentSessionId) div.classList.add('active-session');
 
                     div.innerHTML = `
                         <span onclick="loadChat(${session.id}, '${session.title.replace(/'/g, "\\'")}')" class="truncate flex-1">${session.title}</span>
@@ -123,58 +142,38 @@
         }
 
         async function loadChat(id, title = "Sohbet") {
-            // Aynı sohbete tekrar tıklanırsa işlem yapma
             if (currentSessionId === id) {
-                 if(window.innerWidth < 768) toggleSidebar(); // Mobildeyse kapat
+                 if(window.innerWidth < 768) toggleSidebar(); 
                  return;
             }
 
             currentSessionId = id;
             document.getElementById('header-title').innerText = title;
-
-            // 1. UI Güncelleme (Listeyi silmeden sadece aktifi boya)
             highlightActiveSession(id);
-
-            // 2. Chat Alanını Temizle
-            const chatBox = document.getElementById('chat-box');
-            chatBox.innerHTML = '';
             
-            // 3. Hoşgeldin ekranını gizle
+            const chatBox = document.getElementById('chat-box');
+            chatBox.innerHTML = '<div class="flex justify-center pt-10"><span class="animate-spin text-2xl">⏳</span></div>';
+            
             const ws = document.getElementById('welcome-screen');
             if(ws) ws.style.display = 'none';
 
-            // 4. Mobilde Sidebar'ı kapat
             if(window.innerWidth < 768) toggleSidebar();
 
-            // 5. Mesajları Çek
             try {
-                // Yükleniyor animasyonu ekle
-                chatBox.innerHTML = '<div class="flex justify-center pt-10"><span class="animate-spin text-2xl">⏳</span></div>';
-                
                 const res = await fetch(`/api/session/${id}`);
+                if (res.redirected) { window.location.href = '/login'; return; }
                 const messages = await res.json();
                 
-                chatBox.innerHTML = ''; // Loader'ı sil
-                
-                if (messages.length === 0) {
-                     // Boş sohbet (Hata durumunda vs.)
-                     chatBox.innerHTML = '<div class="text-center text-gray-500 mt-10">Mesaj bulunamadı.</div>';
-                }
-
+                chatBox.innerHTML = ''; 
                 messages.forEach(msg => appendMessage(msg.role, msg.content, false));
                 scrollToBottom();
-
             } catch (e) {
-                chatBox.innerHTML = '<div class="text-center text-red-400 mt-10">Sohbet yüklenirken hata oluştu.</div>';
+                chatBox.innerHTML = '<div class="text-center text-red-400 mt-10">Sohbet yüklenemedi.</div>';
             }
         }
 
         function highlightActiveSession(id) {
-            // Tüm aktif sınıfları kaldır
-            document.querySelectorAll('#session-list > div').forEach(div => {
-                div.classList.remove('active-session');
-            });
-            // Yeni seçilene ekle
+            document.querySelectorAll('#session-list > div').forEach(div => div.classList.remove('active-session'));
             const activeDiv = document.getElementById(`session-${id}`);
             if (activeDiv) activeDiv.classList.add('active-session');
         }
@@ -182,14 +181,13 @@
         function startNewChat() {
             currentSessionId = null;
             document.getElementById('header-title').innerText = "Yeni Sohbet";
-            
-            // Aktif seçimi kaldır
             document.querySelectorAll('#session-list > div').forEach(div => div.classList.remove('active-session'));
 
             document.getElementById('chat-box').innerHTML = `
                 <div id="welcome-screen" class="flex flex-col items-center justify-center h-full text-center space-y-6 opacity-80">
-                    <div class="w-16 h-16 bg-white/5 rounded-2xl flex items-center justify-center text-3xl border border-white/5">✨</div>
+                    <div class="w-16 h-16 bg-white/5 rounded-2xl flex items-center justify-center text-3xl border border-white/5 shadow-2xl">🤖</div>
                     <h2 class="text-xl font-bold text-white">Yeni Sohbet</h2>
+                    <p class="text-sm text-gray-500">Claude 4.5 & Pollinations</p>
                 </div>`;
             
             if(window.innerWidth < 768) toggleSidebar();
@@ -197,14 +195,12 @@
 
         async function deleteSession(id, event) {
             event.stopPropagation();
-            if(confirm('Bu sohbet silinsin mi?')) {
+            if(confirm('Silinsin mi?')) {
                 await fetch(`/api/session/${id}`, { method: 'DELETE' });
                 if(currentSessionId === id) startNewChat();
-                loadSessions(); // Listeyi yenilemek zorundayız çünkü eleman azaldı
+                loadSessions(); 
             }
         }
-
-        // --- MESAJLAŞMA ---
 
         async function sendMessage() {
             const input = document.getElementById('user-input');
@@ -213,7 +209,6 @@
 
             input.value = '';
             input.style.height = 'auto';
-            
             const ws = document.getElementById('welcome-screen');
             if(ws) ws.style.display = 'none';
 
@@ -233,15 +228,17 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ message: message, session_id: currentSessionId })
                 });
+                
+                if (res.redirected) { window.location.href = '/login'; return; }
+                
                 const data = await res.json();
                 document.getElementById('loading').remove();
                 
-                // Eğer bu yeni bir sohbetse listeyi güncelle
                 if (data.session_id && data.new_session) {
                     currentSessionId = data.session_id;
                     document.getElementById('header-title').innerText = data.title;
-                    await loadSessions(); // Listeyi yenile
-                    highlightActiveSession(currentSessionId); // Yeni geleni seçili yap
+                    await loadSessions(); 
+                    highlightActiveSession(currentSessionId); 
                 }
                 
                 appendMessage('assistant', data.response);
@@ -276,7 +273,7 @@
                 btn.className = 'copy-btn';
                 btn.innerText = 'Kopyala';
                 btn.onclick = (e) => {
-                    e.stopPropagation(); // Butona basınca başka event tetikleme
+                    e.stopPropagation();
                     navigator.clipboard.writeText(pre.innerText);
                     btn.innerText = '✓';
                     setTimeout(() => btn.innerText = 'Kopyala', 2000);
@@ -299,7 +296,6 @@
         }
 
         window.onload = loadSessions;
-
         document.getElementById('user-input').addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
         });
